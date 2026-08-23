@@ -92,12 +92,21 @@ PYTHON_EXIT_CODE=$?
 
 echo ""
 echo "--- 6. CLI-Skript Parser Test (main.py) ---"
-docker run --rm "$IMAGE_NAME" python3 /opt/hunyuan3d/main.py --help > /dev/null 2>&1
+echo ""
+echo "--- 6. Skript- & Syntaxprüfung (demo.py & gradio_app.py) ---"
+# Prüft, ob demo.py existiert und fehlerfrei kompiliert/geparst werden kann
+docker run --rm "$IMAGE_NAME" python3 -m py_compile /opt/hunyuan3d/demo.py > /dev/null 2>&1
 if [ $? -eq 0 ]; then
-    echo -e "[\033[92mOK\033[0m] /opt/hunyuan3d/main.py --help reagiert fehlerfrei"
+    echo -e "[\033[92mOK\033[0m] /opt/hunyuan3d/demo.py ist vorhanden und syntaktisch fehlerfrei"
 else
-    echo -e "[\033[91mFAIL\033[0m] /opt/hunyuan3d/main.py --help wirft Fehler"
+    echo -e "[\033[91mFAIL\033[0m] /opt/hunyuan3d/demo.py fehlerhaft oder fehlt"
     PYTHON_EXIT_CODE=1
+fi
+
+# Prüft den Argument-Parser von gradio_app.py
+docker run --rm "$IMAGE_NAME" python3 /opt/hunyuan3d/gradio_app.py --help > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo -e "[\033[92mOK\033[0m] /opt/hunyuan3d/gradio_app.py --help reagiert fehlerfrei"
 fi
 
 echo "============================================================"

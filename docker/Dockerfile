@@ -51,7 +51,7 @@ ENV PYOPENGL_PLATFORM=egl
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=${CUDA_HOME}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
-ENV PYTHONPATH="/opt/hunyuan3d:${PYTHONPATH}"
+ENV PYTHONPATH="/opt/hunyuan3d"
 
 # Startet auf dem RunPod Network-Volume
 WORKDIR /workspace
