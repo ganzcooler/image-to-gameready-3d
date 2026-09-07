@@ -51,7 +51,14 @@ WORKDIR /opt/hunyuan3d/hy3dpaint
 RUN mkdir -p ckpt && \
     wget -c -O ckpt/RealESRGAN_x4plus.pth https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth
 
+# 8b. Eigene Batch-Skripte aus dem Unterordner "scripts/" kopieren & global verlinken
+COPY scripts/batch_shapegen.py scripts/batch_texturegen.py /opt/hunyuan3d/
+RUN chmod +x /opt/hunyuan3d/batch_shapegen.py /opt/hunyuan3d/batch_texturegen.py && \
+    ln -s /opt/hunyuan3d/batch_shapegen.py /usr/local/bin/batch_shapegen && \
+    ln -s /opt/hunyuan3d/batch_texturegen.py /usr/local/bin/batch_texturegen
+
 # 9. Umgebungsvariablen & Laufzeitpfade
+ENV HUNYUAN_ROOT=/opt/hunyuan3d
 ENV HF_HOME=/workspace/hf_cache
 ENV PYOPENGL_PLATFORM=egl
 ENV CUDA_HOME=/usr/local/cuda
