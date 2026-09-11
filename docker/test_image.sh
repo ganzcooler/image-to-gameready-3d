@@ -1,7 +1,3 @@
-# Image builden: docker build -t hunyuan3d:latest .
-# Prüfen ob image da ist: docker images | grep hunyuan3d
-# chmod +x test_image.sh
-# ./test_image.sh hunyuan3d:latest (wenn image so heißt)
 #!/bin/bash
 
 # Bildname als Parameter (Standard: hunyuan3d:latest)
@@ -11,7 +7,7 @@ echo "============================================================"
 echo "  Starte CPU-Testsuite für Image: $IMAGE_NAME"
 echo "============================================================"
 
-docker run --rm "$IMAGE_NAME" python3 - << 'EOF'
+docker run -i --rm "$IMAGE_NAME" python3 - << 'EOF'
 import sys
 import os
 
@@ -37,6 +33,12 @@ import torch
 check("PyTorch Version", lambda: torch.__version__)
 check("PyTorch CUDA-Anbindung", lambda: f"CUDA {torch.version.cuda} Build")
 
+import torchvision
+check("Torchvision Version", lambda: torchvision.__version__)
+
+import torchaudio
+check("Torchaudio Version", lambda: torchaudio.__version__)
+
 print("\n--- 2. 3D- & Rendering-Bibliotheken ---")
 import bpy
 check("Blender (bpy)", lambda: f"v{bpy.app.version_string}")
@@ -45,7 +47,8 @@ import trimesh
 check("Trimesh", lambda: f"v{trimesh.__version__}")
 
 import pymeshlab
-check("PyMeshLab", lambda: f"v{pymeshlab.__version__}")
+from importlib.metadata import version
+check("PyMeshLab", lambda: f"v{version('pymeshlab')}")
 
 import cv2
 check("OpenCV", lambda: f"v{cv2.__version__}")
@@ -59,13 +62,15 @@ import mesh_inpaint_processor
 check("Mesh Inpaint Processor (C++ .so)", lambda: "Erfolgreich geladen")
 
 print("\n--- 4. Hunyuan3D Codebase & Pipeline-Klassen ---")
-import hy3dgen
-check("Hunyuan3D Core (hy3dgen)", lambda: "Erfolgreich geladen")
+sys.path.extend(["/opt/hunyuan3d", "/opt/hunyuan3d/hy3dshape", "/opt/hunyuan3d/hy3dpaint"])
 
-from hy3dgen.shapegen import Hunyuan3DDiTFlowMatchingPipeline
+import hy3dshape
+check("Hunyuan3D Shape Core (hy3dshape)", lambda: "Erfolgreich geladen")
+
+from hy3dshape.pipelines import Hunyuan3DDiTFlowMatchingPipeline
 check("ShapeGen Pipeline Klasse", lambda: Hunyuan3DDiTFlowMatchingPipeline.__name__)
 
-from hy3dgen.texturing import Hunyuan3DPaintPipeline
+from textureGenPipeline import Hunyuan3DPaintPipeline
 check("Paint/Texture Pipeline Klasse", lambda: Hunyuan3DPaintPipeline.__name__)
 
 print("\n--- 5. Hilfsdateien & Checkpoints ---")
@@ -80,38 +85,57 @@ def check_ckpt():
 check("RealESRGAN Checkpoint", check_ckpt)
 
 print("\n------------------------------------------------------------")
+sys.stdout.flush()
+sys.stderr.flush()
 if failed_tests == 0:
     print(f"{GREEN}🎉 ALLE PYTHON-TESTS BESTANDEN!{RESET}")
-    sys.exit(0)
+    os._exit(0)
 else:
     print(f"{RED}❌ {failed_tests} TEST(S) FEHLGESCHLAGEN!{RESET}")
-    sys.exit(1)
+    os._exit(1)
 EOF
 
 PYTHON_EXIT_CODE=$?
 
 echo ""
-echo "--- 6. CLI-Skript Parser Test (main.py) ---"
-echo ""
-echo "--- 6. Skript- & Syntaxprüfung (demo.py & gradio_app.py) ---"
-# Prüft, ob demo.py existiert und fehlerfrei kompiliert/geparst werden kann
-docker run --rm "$IMAGE_NAME" python3 -m py_compile /opt/hunyuan3d/demo.py > /dev/null 2>&1
-if [ $? -eq 0 ]; then
-    echo -e "[\033[92mOK\033[0m] /opt/hunyuan3d/demo.py ist vorhanden und syntaktisch fehlerfrei"
-else
-    echo -e "[\033[91mFAIL\033[0m] /opt/hunyuan3d/demo.py fehlerhaft oder fehlt"
-    PYTHON_EXIT_CODE=1
-fi
+echo "--- 6. Eigene Batch-Skripte & Symlinks prüfen ---"
+# Prüft deine Skripte auf Syntaxfehler
+for script in batch_shapegen.py batch_texturegen.py; do
+    docker run --rm "$IMAGE_NAME" python3 -m py_compile "/opt/hunyuan3d/$script" > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        echo -e "[\033[92mOK\033[0m] /opt/hunyuan3d/$script syntaktisch fehlerfrei"
+    else
+        echo -e "[\033[91mFAIL\033[0m] /opt/hunyuan3d/$script hat Syntaxfehler oder fehlt"
+        PYTHON_EXIT_CODE=1
+    fi
+done
 
-# Prüft den Argument-Parser von gradio_app.py
-docker run --rm "$IMAGE_NAME" python3 /opt/hunyuan3d/gradio_app.py --help > /dev/null 2>&1
+# Prüft, ob die globalen CLI-Befehle verlinkt und aufrufbar sind
+for cmd in batch_shapegen batch_texturegen; do
+    docker run --rm "$IMAGE_NAME" which $cmd > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        echo -e "[\033[92mOK\033[0m] Globaler Befehl '$cmd' im PATH gefunden"
+    else
+        echo -e "[\033[91mFAIL\033[0m] Globaler Befehl '$cmd' fehlt in /usr/local/bin"
+        PYTHON_EXIT_CODE=1
+    fi
+done
+
+echo ""
+echo "--- 7. System- & SSH-Konfiguration ---"
+# Prüft die sshd_config auf Gültigkeit
+docker run --rm "$IMAGE_NAME" sshd -t > /dev/null 2>&1
 if [ $? -eq 0 ]; then
-    echo -e "[\033[92mOK\033[0m] /opt/hunyuan3d/gradio_app.py --help reagiert fehlerfrei"
+    echo -e "[\033[92mOK\033[0m] SSH-Daemon Konfiguration ist gültig"
+else
+    echo -e "[\033[91mFAIL\033[0m] SSH-Daemon Konfiguration fehlerhaft"
+    PYTHON_EXIT_CODE=1
 fi
 
 echo "============================================================"
 if [ $PYTHON_EXIT_CODE -eq 0 ]; then
-    echo -e "\033[92mBereit für RunPod! Das Demoskript wird mit einer NVIDIA-GPU laufen.\033[0m"
+    echo -e "\033[92m✔ Bereit für RunPod! Das Image kann bedenkenlos gepusht werden.\033[0m"
 else
-    echo -e "\033[91mBitte prüfe die Fehlermeldungen oben im Protokoll.\033[0m"
+    echo -e "\033[91m✘ Bitte prüfe die Fehlermeldungen oben im Protokoll vor dem Push.\033[0m"
+    exit 1
 fi

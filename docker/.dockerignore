@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+
+# Python & virtuelle Umgebungen
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Geklonte Hunyuan3D-Ordner (falls du das Repo auch lokal im Ordner liegen hast)
+Hunyuan3D-2.1/
+hy3dpaint/
+
+# Modelldateien, Checkpoints & Caches (die größten Speicherfresser)
+*.pth
+*.pt
+*.safetensors
+*.bin
+*.onnx
+*.ckpt
+weights/
+models/
+ckpt/
+hf_cache/
+
+# 3D-Testdateien & Ausgaben
+*.obj
+*.glb
+*.gltf
+*.ply
+*.fbx
+output/
+outputs/
+results/
+data/
+
+# Editor- & Systemdateien
+.env
+.idea/
+.vscode/
+.DS_Store
+*.log
